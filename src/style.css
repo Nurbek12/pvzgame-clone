@@ -101,15 +101,16 @@ body {
     background-size: cover !important;
 }
 
-.plant-cost.coldown::after {
+.plant-cost.cooldown::after {
     content: '';
     position: absolute;
     top: 0;
     left: 0;
     width: 100%;
-    height: 100%;
+    height: var(--cooldown);
+    transition: height 2s;
     background: #0009;
-    animation: coldown-cost calc(1s * var(--t)) forwards;
+    /* animation: cooldown-cost calc(1s * var(--t)) forwards; */
 }
 
 .plant-cost.notsun::before {
@@ -183,7 +184,7 @@ body {
     background-size: cover;
 }
 
-@keyframes coldown-cost {
+@keyframes cooldown-cost {
     0%{
         height: 100%;
     }
@@ -278,6 +279,7 @@ body {
     border-radius: 50%;
     background: url('../images/s.png');
     background-size: contain;
+    z-index: 4;
     background-repeat: no-repeat;
     animation: spin 20s linear infinite;
 }
@@ -319,4 +321,61 @@ body {
     content: attr('data-text');
     font-size: 5rem;
     color: #fff;
+}
+
+.zombie-progress {
+    bottom: 20px;
+    right: 20px;
+    position: absolute;
+    display: flex;
+    justify-content: flex-end;
+    width: 210px;
+    height: 35px;
+    pointer-events: none;
+    border-radius: 10px;
+    overflow: hidden;
+    align-items: center;
+    background: url('../images/zombirLev.png');
+}
+
+.zombie-progress::after {
+    content: '';
+    position: absolute;
+    background: #089208;
+    border-radius: 4px;
+    right: 7px;
+    width: calc(var(--progress) - 7px);
+    height: 10px;
+}
+
+.zombie-progress .zombie-head {
+    position: absolute;
+    width: 30px;
+    height: 30px;
+    z-index: 1;
+    right: var(--progress);
+    transition: right .5s;
+    background: url('../images/zombhead.png');
+    background-size: cover;
+}
+
+.start-overload {
+    position: fixed;
+    background-color: #0008;
+    width: 100%;
+    height: 100vh;
+    z-index: 555;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.start-button {
+    position: absolute;
+    cursor: pointer;
+    padding: 10px 20px;
+    border-radius: 10px;
+    background: #222;
+    color: #fff;
+    font-size: 2rem;
 }

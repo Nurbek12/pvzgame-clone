@@ -16,16 +16,16 @@
             <div class="plant-board">
                 <div class="sun-score" id="score" @click="addSunScore">{{ suns }}</div>
                 <div class="plants-cost">
-                    <div class="plant-cost coldown sun-cost" :class="suns<50?'notsun':''" @click="open(1, 50)" style="--t: 12;" id="">
+                    <div class="plant-cost sun-cost" :class="[suns<50?'notsun':'', sunPlantCooldown>0?'cooldown':'']" @click="open(1, 50, sunPlantCooldown>0)" :style="{'--cooldown': (sunPlantCooldown * 100 / SUN_PLANT_COOLDOWN) + '%'}" id="">
                     </div>
-                    <div class="plant-cost power-cost" :class="suns<100?'notsun':''" @click="open(2, 100)" style="--t: 14;" id="">
+                    <div class="plant-cost power-cost" :class="[suns<100?'notsun':'', attackPlantCooldown>0?'cooldown':'']" @click="open(2, 100, attackPlantCooldown>0)" :style="{'--cooldown': (attackPlantCooldown * 100 / ATTACK_PLANT_COOLDOWN) + '%'}" id="">
                     </div>
                 </div>
             </div>
             <div v-for="zombie in zombies" :key="zombie.id" :health="zombie.health" :id="zombie.id" :data-y="zombie.y" :style="{'--zombie-x': zombie.x+'px','--zombie-y': zombie.y}" :class="['zombie', zombie.eating ? 'eat' : 'run']"></div>
             <div class="shovel" :class="plant === 3?'on':''" @click="open(3, 0)"></div>
             <div class="areas" :class="plant !== 0?'on':''">
-                <div class="area" v-for="i in 45" :key="i" @click="add(Math.floor((i - 1)/9), (i - 1) % 9)">
+                <div class="area" v-for="i in 45" :key="i" @click="add((i - 1) % 9, Math.floor((i - 1)/9))">
                     <div
                         v-if="map[Math.floor((i - 1)/9)][(i - 1) % 9] !== 0"
                         :last-plant="isLastPlant((i - 1) % 9, Math.floor((i - 1)/9))"
@@ -37,23 +37,42 @@
                         :health="map[Math.floor((i - 1)/9)][(i - 1) % 9].health"
                         :interval="map[Math.floor((i - 1)/9)][(i - 1) % 9].interval">
                     </div>
-                    <!-- :last-plant="isLastPlant(Math.floor((i - 1)/9), ((i - 1) % 9))" -->
                 </div>
+            </div>
+            <div class="zombie-progress" :style="{'--progress': (zombieCount * 100 / MAX_ZOMBIES) + '%'}">
+                <div class="zombie-head"></div>
             </div>
         </div>
         <div v-for="sun,j in sunItems" :key="sun.id" :id="sun.id" @click="sunItemClick(j)" :style="{'--sun-x': sun.x+'px','--sun-y': sun.y+'px'}" class="sun"></div>
         <div v-for="weapon in weapons" :key="weapon.id" :id="weapon.id" :data-y="weapon.gameY" :style="{'--weapon-x': weapon.x+'px','--weapon-y': weapon.y+'px'}" class="weapon"></div>
         <div class="cursor" :class="`cursor-${plant}`" ref="cursor"></div>
         <div class="game-modal" :data-text="isGameWin?'YOU WIN':(isGameOver?'GAME OVER':'')" v-if="isGameOver||isGameWin"></div>
+        <div v-if="!isStarted" class="start-overload">
+            <button class="start-button" @click="start">START GAME</button>
+        </div>
     </div>
     
     <script src="./src/main.js"></script>
-    <script src="./src/vue.global.js"></script>
+    <script src="./src/vue.global.prod.js"></script>
     <script>
-        const MAX_ZOMBIES = 10
+        const MAX_ZOMBIES = 50
+        const INITIAL_SUN = 50;
+        const ZOMBIE_HEATTH = 8;
+        const SUN_PLANT_HEALTH = 5;
+        const ATTACK_PLANT_HEALTH = 5;
+        const ZOMBIE_GENERATE_INTERVAL = 10 * 1000
+        const SUN_GENERATE_INTERVAL = 12 * 1000
+        const PLANTS_INTERVAL = 1000
+        const ATTACK_INTERVAL = 10
+        const SUN_PLANT_INTERVAL = 5;
+        const ATTACK_PLANT_INTERVAL = 5;
+        const SUN_PLANT_COOLDOWN = 8;
+        const ATTACK_PLANT_COOLDOWN = 10;
 
         let interval1
         let interval2
+        let interval3
+        let interval4
 
         const { createApp, ref, onMounted } = Vue
 
@@ -169,9 +188,10 @@
             setup() {
                 const cursor = ref()
                 const plant = ref(0)
-                const suns = ref(10000)
+                const suns = ref(INITIAL_SUN)
                 const currentX = ref(0)
                 const isGameOver = ref(false)
+                const isStarted = ref(false)
                 const isGameWin = ref(false)
                 const currentY = ref(0)
                 const initialX = ref(0)
@@ -188,6 +208,8 @@
                 ])
                 const zombies = ref([])
                 const zombieCount = ref(0)
+                const sunPlantCooldown = ref(SUN_PLANT_COOLDOWN)
+                const attackPlantCooldown = ref(ATTACK_PLANT_COOLDOWN)
                 
 
                 function onMouseDown(e) {
@@ -208,21 +230,23 @@
                     if(position.value === 'off') return
                     
                     else if(position.value === 'on') {
-                        if(map.value[x][y] === 0 || plant.value === 3) {
+                        if(map.value[y][x] === 0 || plant.value === 3) {
                             const id = Date.now()
                             switch(plant.value){
                                 case 1:
                                     const newSunPlant = new SunPlant(id, 'plant-1', 4, x, y, 8, () => sunPlantCallback(id))
-                                    map.value[x][y] = newSunPlant;
+                                    map.value[y][x] = newSunPlant;
                                     suns.value -= 50
+                                    sunPlantCooldown.value = SUN_PLANT_COOLDOWN
                                     break;
                                 case 2:
-                                    const newAttackPlant = new AttackPlant(id, 'plant-2', 10, x, y, Math.random() > 0.5 ? 3 : 2, () => attackPlantCallback(id, x))
-                                    map.value[x][y] = newAttackPlant;
+                                    const newAttackPlant = new AttackPlant(id, 'plant-2', 10, x, y, Math.random() > 0.5 ? 3 : 2, () => attackPlantCallback(id, y))
+                                    map.value[y][x] = newAttackPlant;
                                     suns.value -= 100
+                                    attackPlantCooldown.value = ATTACK_PLANT_COOLDOWN
                                     break;
                                 case 3: 
-                                    map.value[x][y] = 0;
+                                    map.value[y][x] = 0;
                                     break;
                             }
                             playSound('plant.ogg')
@@ -253,14 +277,15 @@
                     // winmusic.ogg
                 }
                 
-                function open(n, sun){
+                function open(n, sun, isCooldown){
+                    if(suns.value<sun || isCooldown){
+                        playSound('buzzer.ogg')
+                        return
+                    }
+
                     if(plant.value === n) {
                         close()
                         playSound('ceramic.ogg')
-                        return
-                    }
-                    if(suns.value<sun){
-                        playSound('buzzer.ogg')
                         return
                     }
                     switch(n){
@@ -289,7 +314,10 @@
                 }
 
                 function generateZombie(){
-                    // if(zombieCount.value === 0) playSound('awooga.ogg')
+                    if(zombieCount.value === 0) playSound('awooga.ogg')
+
+                    if(zombieCount.value >= MAX_ZOMBIES) return
+
                     const randomY = Math.floor(Math.random() * 5);
                     const id = Date.now()
 
@@ -299,74 +327,42 @@
                     zombieCount.value += 1
                 }
 
-                function start(){
-                    // generateZombie()
-                    // setInterval(() => {
-                    //     document.querySelectorAll('.zombie').forEach(zombie => {
-                    //         // zl -= 1
-                    //         let zc = zombie.getBoundingClientRect();
-                    //         const plants = document.querySelectorAll(`[data-x="${zombie.getAttribute('data-z-x')}"]`);
-                    //         zl = zombie.getAttribute('data-left')
-                    //         // const audio = new Audio('./sound/chomp.ogg')
-                    //         // audio.loop = true
-                    //         plants.forEach(plant => {
-                    //             let pc = plant.getBoundingClientRect();
-                    //             // console.log(pc.top < zc.bottom &&
-                    //             //     pc.bottom, zc.top,
-                    //             //     pc.left, zc.right,
-                    //             //     pc.right, zc.left);
-                    //             if(pc.bottom >= zc.top &&
-                    //                 pc.top <= zc.bottom &&
-                    //                 pc.right - 50 >= zc.left &&
-                    //                 pc.left + 50 <= zc.right){
-                    //                     zombie.classList.remove('run')
-                    //                     zombie.classList.add('eat')
-                    //                     plant.classList.add('warning')
-                    //                     // console.log(1);
-                    //                     // audio.play()
-                    //                     zl -= 0
-                    //             }else{
-                    //                 plant.classList.remove('warning')
-                    //                 zombie.classList.remove('eat')
-                    //                 zombie.classList.add('run')
-                    //                 // audio.pause()
-                    //             if(zl > -200) zl -= 2
-                                    
-                    //             }
-                    //         })
-                    //         if(plants.length === 0) {
-                    //             zombie.classList.remove('eat')
-                    //             zombie.classList.add('run')
-                    //             if(zl > -200) zl -= 2
-                    //             // audio.pause()
-                    //         }
-                    //         zombie.style.left = zl + 'px'
-                    //         zombie.setAttribute('data-left', zl)
-                            
-                    //     })
-                    // }, 100)
-                    
+                function minusCoolDown () {
+                    if(sunPlantCooldown.value > 0) sunPlantCooldown.value -= 1
+                    if(attackPlantCooldown.value > 0) attackPlantCooldown.value -= 1
+                }
+
+                function start(){ 
+                    isStarted.value = true
+
+                    playSound('plants_vs_zombies_04 - Grasswalk.mp3')
+
                     interval1 = setInterval(() => {
                         intervalZombies()
                         intervalPlants()
+                        minusCoolDown()
 
                         if(isGameOver.value || isGameWin.value) {
                             if(isGameWin.value) playSound('winmusic.ogg')
                             if(isGameOver.value) playSound('losemusic.ogg')
                             clearInterval(interval1)
                             clearInterval(interval2)
+                            clearInterval(interval3)
+                            clearInterval(interval4)
                         }
-                    }, 1000)
-
-                    // setInterval(() => {
-                        generateZombie()
-                    // }, 4000)
+                    }, PLANTS_INTERVAL)
 
                     interval2 = setInterval(() => {
                         intervalAttack()
-                    }, 10)
+                    }, ATTACK_INTERVAL)
 
-                    
+                    interval3 = setInterval(() => {
+                        new Array(Math.floor(Math.random()) + 1).fill(0).map(() => generateZombie())
+                    }, ZOMBIE_GENERATE_INTERVAL)
+                
+                    interval4 = setInterval(() => {
+                        generateSun()
+                    }, SUN_GENERATE_INTERVAL)
                 }
 
                 function intervalPlants() {
@@ -402,6 +398,9 @@
                                     zombies.value.splice(zombieIndex, 1)
 
                                 weapons.value.splice(i, 1)
+                                
+                                if(zombieCount.value === MAX_ZOMBIES) isGameWin.value = true
+
                                 return
                             }
                         }
@@ -494,16 +493,28 @@
 
                 }
 
+                function generateSun() {
+                    const gameArea = document.querySelector('.areas')
+                    
+                    const sizes = gameArea.getBoundingClientRect()
+
+                    const sunId = 'sun-'+Date.now()
+
+                    const sun = new Sun(sunId, Math.floor(Math.random() * sizes.width), Math.floor(Math.random() * sizes.height), 7, () => removeSun(sunId))
+
+                    sunItems.value.push(sun)
+                }
+
                 onMounted(() => {
                     window.addEventListener('mousemove', onMouseMove)
                     window.addEventListener('mousedown', onMouseDown)
-                    // playSound('plants_vs_zombies_04 - Grasswalk.mp3')
-                    // setTimeout(() => start(), 5000)
-                    start()
-                    // window.addEventListener('dblclick', ()  => start())
                 })
 
+
                 return {
+                    MAX_ZOMBIES,
+                    SUN_PLANT_COOLDOWN,
+                    ATTACK_PLANT_COOLDOWN,
                     plant,
                     suns,
                     currentX,
@@ -513,11 +524,15 @@
                     position,
                     map,
                     zombies,
+                    zombieCount,
                     cursor,
                     sunItems,
                     weapons,
                     isGameWin,
                     isGameOver,
+                    isStarted,
+                    sunPlantCooldown,
+                    attackPlantCooldown,
                     onMouseDown,
                     onMouseMove,
                     add,
@@ -543,9 +558,10 @@
 </html>
 <!-- 
     TODO:
-    [-] zobie generate
-    [-] zobie kill
-    [-] zobie eat
-    [-] game over
-    [-] coldown
+    [+|-] zobie generate | fix kill bug
+    [+] zobie kill
+    [+] zobie eat
+    [+] game over
+    [+] coldown
+    [+] area suns
 -->
