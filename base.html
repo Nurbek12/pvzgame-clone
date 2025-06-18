@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Simple Plants vs. Zombies</title>
+    <style>
+        #gameCanvas {
+            border: 1px solid black;
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        plantImgsrc = './images/gifs/sunflower-pvz.gif';
+        zombieImgsrc = './images/gifs/zombie-d.gif';
+        plantAttackImgssrc = './images/gifs/Peashooter_transparent_gif.webp';
+
+        const assets = {};
+const assetPromises = [];
+
+// function loadAsset(assetUrl) {
+//   const img = new Image();
+//   const promise = new Promise((resolve, reject) => {
+//     img.onload = () => {
+//       assets[assetUrl] = img;
+//       resolve();
+//     };
+//     img.onerror = reject;
+//   });
+//   img.src = assetUrl;
+//   assetPromises.push(promise);
+// }
+
+// // loadAsset("plantattack.gif");
+// loadAsset(zombieImgsrc);
+// loadAsset(plantAttackImgssrc);
+
+// Promise.all(assetPromises).then((data) => {
+//   console.log(assetPromises, data);
+// });
+
+        let lastFrameTime = Date.now() / 1000;
+
+        class Plant {
+  constructor(x, y) {
+    this.x = x;
+    this.y = y;
+    this.width = 100;
+    this.height = 100;
+    this.health = 100;
+    this.attackSpeed = 1; // attacks per second
+    this.lastAttackTime = 0;
+  }
+
+  update(deltaTime) {
+    if (this.lastAttackTime + 1 / this.attackSpeed < Date.now() / 1000) {
+      this.lastAttackTime = Date.now() / 1000;
+      // TODO: Attack zombies
+    }
+  }
+
+  draw() {
+    ctx.drawImage(plantAttackImgssrc, this.x, this.y, this.width, this.height);
+  }
+}
+
+const plants = [
+  new Plant(100, 100),
+  new Plant(200, 100),
+  new Plant(300, 100),
+];
+
+        class Zombie {
+  constructor(x, y) {
+    this.x = x;
+    this.y = y;
+    this.width = 100;
+    this.height = 100;
+    this.health = 100;
+    this.speed = 50; // pixels per second
+  }
+
+  update(deltaTime) {
+    const dx = -this.speed * deltaTime;
+    this.x += dx;
+  }
+
+  draw() {
+    ctx.drawImage(zombieImgsrc, this.x, this.y, this.width, this.height);
+  }
+}
+
+const zombies = [
+  new Zombie(800, 100),
+  new Zombie(800, 200),
+  new Zombie(800, 300),
+];
+
+function gameLoop() {
+  // Calculate delta time
+  const currentTime = Date.now() / 1000;
+  const deltaTime = currentTime - lastFrameTime;
+  lastFrameTime = currentTime;
+
+  // Update plants
+  plants.forEach((plant) => plant.update(deltaTime));
+
+  // Update zombies
+  zombies.forEach((zombie) => zombie.update(deltaTime));
+
+  // Clear canvas
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Draw plants
+  plants.forEach((plant) => plant.draw());
+
+  // Draw zombies
+  zombies.forEach((zombie) => zombie.draw());
+
+  // Request the next frame
+  requestAnimationFrame(gameLoop);
+}
+
+// Start the game loop
+setTimeout(() => {
+
+    requestAnimationFrame(gameLoop);
+}, 2000)
+    </script>
+</body>
+
+</html>
+
+
+
+

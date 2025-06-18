@@ -1,0 +1,322 @@
+[v-cloak] {
+    display: none;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: monospace;
+}
+
+body {
+    overflow: hidden;
+}
+
+#game {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-blend-mode: multiply;
+    background: url('../images/background.jpg'), #000a;
+    background-size: cover;
+    overflow: hidden;
+}
+
+.game {
+    position: absolute;
+    width: 910px;
+    overflow: hidden;
+    height: 505px;
+    /* overflow: hidden; */
+    background: url('../images/Background1.webp');
+    background-position: -80px 1px;
+}
+
+.plant-board {
+    position: absolute;
+    width: 155px;
+    overflow: hidden;
+    border-radius: 4px;
+    left: 140px;
+    height: 70px;
+    z-index: 1;
+    background: url('../images/panel.jpg');
+    background-size: cover;
+}
+
+.shovel {
+    position: absolute;
+    width: 58px;
+    height: 58px;
+    left: 295px;
+    overflow: hidden;
+    border-radius: 6px;
+    background: url('../images/shovel-on.jpg');
+    background-size: cover !important;
+    cursor: pointer;
+
+}
+
+.shovel.on {
+    background: url('../images/shovel-off.jpg');
+}
+
+.sun-score {
+    position: absolute;
+    width: 43px;
+    height: 16px;
+    display: flex;
+    font-weight: bold;
+    bottom: 4px;
+    left: 10px;
+    justify-content: center;
+    align-items: center;
+    user-select: none;
+}
+
+.plants-cost {
+    position: absolute;
+    width: 87px;
+    height: 56px;
+    top: 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 4px;
+    padding: 1px;
+    right: 6px;
+    overflow: hidden;
+    border-radius: 4px;
+}
+
+.plant-cost {
+    position: relative;
+    cursor: pointer;
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+    border-radius: 3px;
+    background-size: cover !important;
+}
+
+.plant-cost.coldown::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: #0009;
+    animation: coldown-cost calc(1s * var(--t)) forwards;
+}
+
+.plant-cost.notsun::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: #0005;
+}
+
+.plant-cost.sun-cost {
+    background: url('../images/plantsun.jpg');
+}
+
+.plant-cost.power-cost {
+    background: url('../images/plantattack.jpg');
+}
+
+
+.areas{
+    position: absolute;
+    width: 640px;
+    height: 425px;
+    bottom: 10px;
+    left: 130px;
+    display: grid;
+    grid-template-columns: repeat(9, 1fr);
+    grid-template-rows: repeat(5, 1fr);
+}
+
+.areas.on .area:hover {
+    background: #fff4;
+}
+
+.area {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.plant-1{
+    position: absolute;
+    width: 90%;
+    height: 80%;
+    background: url('../images/gifs/sunflower-pvz.gif');
+    background-size: cover;
+}
+
+.plant-1.create-sun {
+    animation: create-sun 2s linear forwards;
+}
+
+@keyframes create-sun {
+    0%, 100% {
+        filter: brightness(1);
+    }
+
+    70% {
+        filter: brightness(2);
+    }
+}
+
+.plant-2{
+    position: absolute;
+    width: 90%;
+    height: 80%;
+    background: url('../images/gifs/Peashooter_transparent_gif.webp');
+    background-size: cover;
+}
+
+@keyframes coldown-cost {
+    0%{
+        height: 100%;
+    }
+    100% {
+        height: 0%;
+    }
+}
+
+@keyframes zombie-run {
+    100%{
+        left: -250px;
+    }
+}
+
+.cursor {
+    position: absolute;
+    width: 60px;
+    height: 60px;
+    background-size: cover !important;
+    z-index: 555;
+    pointer-events: none;
+}
+
+.cursor-3 {
+    background: url('../images/shovel-curs.png');
+}
+
+.cursor-1 {
+    width: 50px;
+    height: 60px;
+    background: url('../images/sun.png');
+    opacity: .6;
+}
+.cursor-2 {
+    width: 50px;
+    height: 60px;
+    background: url('../images/attack.png');
+    opacity: .6;
+}
+
+.zombie {
+    pointer-events: none;
+    width: 110px;
+    height: 110px;
+    position: absolute;
+    top: calc(var(--zombie-y) * 85px + 40px);
+    left: var(--zombie-x);
+    transition: left 1s, filter 1s;
+    background-size: cover !important;
+    z-index: .8;
+}
+
+.zombie:active {
+    filter: brightness(2);
+}
+
+.zombie.run {
+    background: url('../images/gifs/zombie-d.gif');
+    background-repeat: no-repeat;
+    background-size: 100px 120px !important;
+    background-position: center 0px;
+    /* animation: zombie-run 120s linear forwards; */
+}
+
+.zombie.eat {
+    background: url('../images/gifs/zombie-eat.gif');
+    background-position: -8px 14px;
+    background-size: 100px 100px !important;
+    background-repeat: no-repeat;
+}
+
+.warning {
+    animation: warning .6s linear infinite;
+}
+
+@keyframes warning {
+    0%, 100%{
+        filter: brightness(2);
+    }
+    50% {
+        filter: brightness(1);
+    }
+}
+
+.sun {
+    position: absolute;
+    width: 40px;
+    height: 40px;
+    top: calc(var(--sun-y) + 40px);
+    cursor: pointer;
+    left: calc(var(--sun-x) + 40px);
+    border-radius: 50%;
+    background: url('../images/s.png');
+    background-size: contain;
+    background-repeat: no-repeat;
+    animation: spin 20s linear infinite;
+}
+
+@keyframes spin {
+    0%{
+        transform: rotate(0);
+    }
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+.weapon {
+    position: absolute;
+    width: 15px;
+    height: 15px;
+    top: calc(var(--weapon-y) + 20px);
+    left: calc(var(--weapon-x) + 50px);
+    border-radius: 50%;
+    background: url('../images/weapon.png');
+    background-size: contain;
+    background-repeat: no-repeat;
+    transition: left 5s;
+}
+
+.game-over-modal {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    background: #0008;
+    z-index: 8;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.game-modal::after {
+    content: attr('data-text');
+    font-size: 5rem;
+    color: #fff;
+}

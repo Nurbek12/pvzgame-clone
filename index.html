@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plants vs Zombies</title>
+    <link rel="shortcut icon" href="./images/sun-icon.png" type="image/x-icon">
+    <link rel="stylesheet" href="./src/style.css">
+</head>
+
+<body>
+    <div id="game" v-cloak>
+        <div class="game">
+            <div class="plant-board">
+                <div class="sun-score" id="score" @click="addSunScore">{{ suns }}</div>
+                <div class="plants-cost">
+                    <div class="plant-cost coldown sun-cost" :class="suns<50?'notsun':''" @click="open(1, 50)" style="--t: 12;" id="">
+                    </div>
+                    <div class="plant-cost power-cost" :class="suns<100?'notsun':''" @click="open(2, 100)" style="--t: 14;" id="">
+                    </div>
+                </div>
+            </div>
+            <div v-for="zombie in zombies" :key="zombie.id" :health="zombie.health" :id="zombie.id" :data-y="zombie.y" :style="{'--zombie-x': zombie.x+'px','--zombie-y': zombie.y}" :class="['zombie', zombie.eating ? 'eat' : 'run']"></div>
+            <div class="shovel" :class="plant === 3?'on':''" @click="open(3, 0)"></div>
+            <div class="areas" :class="plant !== 0?'on':''">
+                <div class="area" v-for="i in 45" :key="i" @click="add(Math.floor((i - 1)/9), (i - 1) % 9)">
+                    <div
+                        v-if="map[Math.floor((i - 1)/9)][(i - 1) % 9] !== 0"
+                        :last-plant="isLastPlant((i - 1) % 9, Math.floor((i - 1)/9))"
+                        :data-x="(i - 1) % 9"
+                        :data-y="Math.floor((i - 1)/9)"
+                        :id="map[Math.floor((i - 1)/9)][(i - 1) % 9].id"
+                        :key="map[Math.floor((i - 1)/9)][(i - 1) % 9].id"
+                        :class="[map[Math.floor((i - 1)/9)][(i - 1) % 9].name, map[Math.floor((i - 1)/9)][(i - 1) % 9].warning ? 'warning' : '', 'plant-item']"
+                        :health="map[Math.floor((i - 1)/9)][(i - 1) % 9].health"
+                        :interval="map[Math.floor((i - 1)/9)][(i - 1) % 9].interval">
+                    </div>
+                    <!-- :last-plant="isLastPlant(Math.floor((i - 1)/9), ((i - 1) % 9))" -->
+                </div>
+            </div>
+        </div>
+        <div v-for="sun,j in sunItems" :key="sun.id" :id="sun.id" @click="sunItemClick(j)" :style="{'--sun-x': sun.x+'px','--sun-y': sun.y+'px'}" class="sun"></div>
+        <div v-for="weapon in weapons" :key="weapon.id" :id="weapon.id" :data-y="weapon.gameY" :style="{'--weapon-x': weapon.x+'px','--weapon-y': weapon.y+'px'}" class="weapon"></div>
+        <div class="cursor" :class="`cursor-${plant}`" ref="cursor"></div>
+        <div class="game-modal" :data-text="isGameWin?'YOU WIN':(isGameOver?'GAME OVER':'')" v-if="isGameOver||isGameWin"></div>
+    </div>
+    
+    <script src="./src/main.js"></script>
+    <script src="./src/vue.global.js"></script>
+    <script>
+        const MAX_ZOMBIES = 10
+
+        let interval1
+        let interval2
+
+        const { createApp, ref, onMounted } = Vue
+
+        class Element {
+            constructor(id, name, health, x, y, interval) {
+                this.x = x
+                this.y = y
+                this.id = id
+                this.name = name
+                this.health = health
+                this.interval = interval
+                this.initialInterval = interval
+            }
+
+            onInterval(callback, limit=0) {
+                this.interval--
+                if(this.interval === limit) {
+                    callback?.()
+                    this.interval = this.initialInterval
+                }
+            }
+        }
+
+        class SunPlant extends Element {
+            constructor(id, name, health, x, y, interval, intervalCallback) {
+                super(id, name, health, x, y, interval)
+                this.warning = false
+                this.intervalCallback = intervalCallback
+            }
+            
+            plantInterval() {
+                this.onInterval(this.createSun.bind(this))
+            }
+            
+            createSun() {
+                const plant = document.getElementById(this.id)
+               
+                plant.classList.add('create-sun')
+                const timeout = setTimeout(() => {
+                    plant.classList.remove('create-sun')
+                    this.intervalCallback?.()
+                    clearInterval(timeout)
+                }, 2000)
+
+            }
+        }
+
+        class AttackPlant extends Element {
+            constructor(id, name, health, x, y, interval, intervalCallback) {
+                super(id, name, health, x, y, interval)
+                this.warning = false
+                this.intervalCallback = intervalCallback
+            }
+            
+            plantInterval() {
+                this.onInterval(this.intervalCallback)
+            }
+        }
+
+        class Sun extends Element {
+            constructor(id, x, y, interval, intervalCallback) {
+                super(id, 'sun', 1, x, y, interval)
+                this.intervalCallback = intervalCallback
+            }
+
+            sunInterval() {
+                this.onInterval(this.intervalCallback)
+            }
+        }
+        
+        class Weapon extends Element {
+            constructor(id, x, y, interval, intervalCallback, removeCallback, gameY) {
+                super(id, 'weapon', 1, x, y, interval)
+                this.initialX = x
+                this.gameY = gameY
+                this.removeCallback = removeCallback
+                this.intervalCallback = intervalCallback
+            }
+
+            weaponInterval() {
+                this.x += 200;
+                this.onInterval(this.intervalCallback, -200)
+                
+                if(this.interval === -199) {
+                    this.removeCallback?.()
+                }
+            }
+            
+            kill() {
+                
+            }
+        }
+        
+        class Zombile extends Element {
+            constructor(id, x, y, interval, intervalCallback, eatCallback) {
+                super(id, 'zombie', 8, x, y, interval)
+                this.eating = false
+                this.eatCallback = eatCallback
+                this.intervalCallback = intervalCallback
+            }
+
+            zombieInterval() {
+                if(this.eating) {
+                    this.onInterval(this.eatCallback)
+                } else {
+                    this.x -= 8;
+                    this.onInterval(this.intervalCallback)
+                }
+            }
+        }
+
+        const app = createApp({
+            setup() {
+                const cursor = ref()
+                const plant = ref(0)
+                const suns = ref(10000)
+                const currentX = ref(0)
+                const isGameOver = ref(false)
+                const isGameWin = ref(false)
+                const currentY = ref(0)
+                const initialX = ref(0)
+                const initialY = ref(0)
+                const position = ref(0)
+                const sunItems = ref([])
+                const weapons = ref([])
+                const map = ref([
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0],
+                ])
+                const zombies = ref([])
+                const zombieCount = ref(0)
+                
+
+                function onMouseDown(e) {
+                    initialX.value = e.clientX - currentX.value;
+                    initialY.value = e.clientY - currentY.value;
+                }
+                
+                function onMouseMove(e) {
+                    e.preventDefault();
+                    currentX.value = e.clientX - initialX.value;
+                    currentY.value = e.clientY - initialY.value;
+
+                    cursor.value.style.left = currentX.value - 20 + 'px';
+                    cursor.value.style.top = currentY.value - 25 + 'px';
+                }
+                
+                function add(x, y){
+                    if(position.value === 'off') return
+                    
+                    else if(position.value === 'on') {
+                        if(map.value[x][y] === 0 || plant.value === 3) {
+                            const id = Date.now()
+                            switch(plant.value){
+                                case 1:
+                                    const newSunPlant = new SunPlant(id, 'plant-1', 4, x, y, 8, () => sunPlantCallback(id))
+                                    map.value[x][y] = newSunPlant;
+                                    suns.value -= 50
+                                    break;
+                                case 2:
+                                    const newAttackPlant = new AttackPlant(id, 'plant-2', 10, x, y, Math.random() > 0.5 ? 3 : 2, () => attackPlantCallback(id, x))
+                                    map.value[x][y] = newAttackPlant;
+                                    suns.value -= 100
+                                    break;
+                                case 3: 
+                                    map.value[x][y] = 0;
+                                    break;
+                            }
+                            playSound('plant.ogg')
+                            close()
+                        }else{
+                            playSound('buzzer.ogg')
+                        }
+                    }
+                }
+                
+                function addSunScore(){
+                    suns.value += 25
+                    playSound('points.ogg')
+                }
+                
+                function playSound(src, loop){
+                    const audio = new Audio(`./sound/${src}`)
+                    if(loop) audio.loop = true
+                    audio.play().then(() => delete audio)
+                }
+                
+                function sunItemClick(i) {
+                    sunItems.value.splice(i, 1)
+                    addSunScore()
+                }
+
+                function finish(){
+                    // winmusic.ogg
+                }
+                
+                function open(n, sun){
+                    if(plant.value === n) {
+                        close()
+                        playSound('ceramic.ogg')
+                        return
+                    }
+                    if(suns.value<sun){
+                        playSound('buzzer.ogg')
+                        return
+                    }
+                    switch(n){
+                        case 1: case 2: playSound('seedlift.ogg'); break;
+                        case 3: playSound('shovel.ogg'); break;
+                    }
+                    position.value = 'on'
+                    plant.value = n;
+                }
+                
+                function close() {
+                    plant.value = 0
+                    position.value = 'off'
+                }
+
+                function atack(){
+                    // kernelpult2.ogg
+                }
+
+                function eat(){
+                    // chomp.ogg
+                }
+
+                function run(){
+                    // / / groan5.ogg
+                }
+
+                function generateZombie(){
+                    // if(zombieCount.value === 0) playSound('awooga.ogg')
+                    const randomY = Math.floor(Math.random() * 5);
+                    const id = Date.now()
+
+                    const zombie = new Zombile(id, 800, randomY, 1, zombieCallback(id))
+                    zombies.value.push(zombie)
+
+                    zombieCount.value += 1
+                }
+
+                function start(){
+                    // generateZombie()
+                    // setInterval(() => {
+                    //     document.querySelectorAll('.zombie').forEach(zombie => {
+                    //         // zl -= 1
+                    //         let zc = zombie.getBoundingClientRect();
+                    //         const plants = document.querySelectorAll(`[data-x="${zombie.getAttribute('data-z-x')}"]`);
+                    //         zl = zombie.getAttribute('data-left')
+                    //         // const audio = new Audio('./sound/chomp.ogg')
+                    //         // audio.loop = true
+                    //         plants.forEach(plant => {
+                    //             let pc = plant.getBoundingClientRect();
+                    //             // console.log(pc.top < zc.bottom &&
+                    //             //     pc.bottom, zc.top,
+                    //             //     pc.left, zc.right,
+                    //             //     pc.right, zc.left);
+                    //             if(pc.bottom >= zc.top &&
+                    //                 pc.top <= zc.bottom &&
+                    //                 pc.right - 50 >= zc.left &&
+                    //                 pc.left + 50 <= zc.right){
+                    //                     zombie.classList.remove('run')
+                    //                     zombie.classList.add('eat')
+                    //                     plant.classList.add('warning')
+                    //                     // console.log(1);
+                    //                     // audio.play()
+                    //                     zl -= 0
+                    //             }else{
+                    //                 plant.classList.remove('warning')
+                    //                 zombie.classList.remove('eat')
+                    //                 zombie.classList.add('run')
+                    //                 // audio.pause()
+                    //             if(zl > -200) zl -= 2
+                                    
+                    //             }
+                    //         })
+                    //         if(plants.length === 0) {
+                    //             zombie.classList.remove('eat')
+                    //             zombie.classList.add('run')
+                    //             if(zl > -200) zl -= 2
+                    //             // audio.pause()
+                    //         }
+                    //         zombie.style.left = zl + 'px'
+                    //         zombie.setAttribute('data-left', zl)
+                            
+                    //     })
+                    // }, 100)
+                    
+                    interval1 = setInterval(() => {
+                        intervalZombies()
+                        intervalPlants()
+
+                        if(isGameOver.value || isGameWin.value) {
+                            if(isGameWin.value) playSound('winmusic.ogg')
+                            if(isGameOver.value) playSound('losemusic.ogg')
+                            clearInterval(interval1)
+                            clearInterval(interval2)
+                        }
+                    }, 1000)
+
+                    // setInterval(() => {
+                        generateZombie()
+                    // }, 4000)
+
+                    interval2 = setInterval(() => {
+                        intervalAttack()
+                    }, 10)
+
+                    
+                }
+
+                function intervalPlants() {
+                    map.value.forEach(items => {
+                        items.forEach(item => {
+                            if(!item && !item.interval) return
+                            
+                            // if(item.name === 'plant-1' || 1 || (item.name === 'plant-2' && zombies.value.find(z => z.y === item.y))) {
+                            // }
+                            item.plantInterval()
+                        })
+                    })
+                    sunItems.value.forEach(item => item.sunInterval())
+                }
+
+                function intervalAttack() {
+                    weapons.value.forEach((w, i) => { 
+                        const weapon = document.getElementById(w.id)
+                        const zombie = document.querySelector(`.zombie[data-y="${w.gameY}"]`)
+                        
+                        if(zombie) {
+                            const zombieLeft = zombie.getBoundingClientRect()
+                            const weaponLeft = weapon.getBoundingClientRect()
+
+                            if(weaponLeft.left - zombieLeft.left > 20) {
+                                playSound(['splat.ogg','splat2.ogg','splat3.ogg'][Math.floor(Math.random()*3)])
+                                const zombieId = zombie.getAttribute('id')
+                                const zombieIndex = zombies.value.findIndex(z => z.id == zombieId)
+                                zombies.value[zombieIndex].health -= 1
+                                zombie.click()
+
+                                if(zombies.value[zombieIndex].health === 0)
+                                    zombies.value.splice(zombieIndex, 1)
+
+                                weapons.value.splice(i, 1)
+                                return
+                            }
+                        }
+                        w.weaponInterval()
+                    })
+                }
+
+                function intervalZombies() {
+                    zombies.value.forEach(z => {
+                        z.zombieInterval()
+
+                        if(z.x < -150) {
+                            isGameOver.value = true
+                            return
+                        }
+
+                        const zombie = document.getElementById(z.id)
+                        const plant = document.querySelector(`.plant-item[data-y="${z.y}"][last-plant="true"]`)
+        
+                        if(!plant) return
+                    
+                        const zombieLeft = zombie.getBoundingClientRect()
+                        const zombieId = zombie.getAttribute('id')
+                        const plantLeft = plant.getBoundingClientRect()
+                        const zombieIndex = zombies.value.findIndex(z => z.id == zombieId)
+                        const between = zombieLeft.left - plantLeft.left
+                        
+                        if(between < 30) {
+                            zombies.value[zombieIndex].eating = true
+                            const plantX = plant.getAttribute('data-x')
+                            const planty = plant.getAttribute('data-y')
+                            
+                            const p = map.value[+planty][+plantX]
+                            p.health -= 1
+                            p.warning = true
+
+                            if(p.health === 0) {
+                                p.warning = false
+                                zombies.value[zombieIndex].eating = false
+                                map.value[+planty][+plantX] = 0
+                            }
+                        } else {
+                            zombies.value[zombieIndex].eating = false
+                        }
+                    })
+                }
+
+                function isLastPlant(x, y) {
+                    for(let i = 8; i > x; i--) {
+                        if(map.value[y][i] !== 0) {
+                            return false
+                        }
+                    }
+                    return true
+                }
+
+                function removeSun(id) {
+                    const index = sunItems.value.findIndex(s => s.id === id)
+                    sunItems.value.splice(index, 1)
+                }
+
+                function removeWeapon(id) {
+                    const index = weapons.value.findIndex(s => s.id === id)
+                    weapons.value.splice(index, 1)
+                }
+
+                function sunPlantCallback (id) {
+                    const _id = 'sun-'+id
+                    const plant = document.getElementById(id)
+                    const { left, top } = plant.getBoundingClientRect()
+                    
+                    const sun = new Sun(_id, Math.floor(left), Math.floor(top), 7, () => removeSun(_id))
+                    sunItems.value.push(sun)
+                }
+
+                function attackPlantCallback(id, y) {            
+                    if(!zombies.value.some(z => z.y === y)) return
+
+                    const _id = 'weapon' + Date.now()
+                    const plant = document.getElementById(id)
+                    const { left, top } = plant.getBoundingClientRect()
+                    
+                    const weapon = new Weapon(_id, Math.floor(left), Math.floor(top), 10, null, () => {
+                        removeWeapon(_id)
+                    }, y)
+                    weapons.value.push(weapon)
+                }
+
+                function zombieCallback(id) {
+
+                }
+
+                onMounted(() => {
+                    window.addEventListener('mousemove', onMouseMove)
+                    window.addEventListener('mousedown', onMouseDown)
+                    // playSound('plants_vs_zombies_04 - Grasswalk.mp3')
+                    // setTimeout(() => start(), 5000)
+                    start()
+                    // window.addEventListener('dblclick', ()  => start())
+                })
+
+                return {
+                    plant,
+                    suns,
+                    currentX,
+                    currentY,
+                    initialX,
+                    initialY,
+                    position,
+                    map,
+                    zombies,
+                    cursor,
+                    sunItems,
+                    weapons,
+                    isGameWin,
+                    isGameOver,
+                    onMouseDown,
+                    onMouseMove,
+                    add,
+                    addSunScore,
+                    playSound,
+                    finish,
+                    open,
+                    close,
+                    atack,
+                    eat,
+                    run,
+                    start,
+                    sunItemClick,
+                    isLastPlant,
+                }
+            },
+        });
+
+        app.mount('#game');
+    </script>
+</body>
+
+</html>
+<!-- 
+    TODO:
+    [-] zobie generate
+    [-] zobie kill
+    [-] zobie eat
+    [-] game over
+    [-] coldown
+-->
