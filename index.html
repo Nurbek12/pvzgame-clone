@@ -55,16 +55,16 @@
     <script src="./src/main.js"></script>
     <script src="./src/vue.global.prod.js"></script>
     <script>
-        const MAX_ZOMBIES = 50
-        const INITIAL_SUN = 50;
+        const MAX_ZOMBIES = 20
+        const INITIAL_SUN = 500;
         const ZOMBIE_HEATTH = 8;
         const SUN_PLANT_HEALTH = 5;
         const ATTACK_PLANT_HEALTH = 5;
         const ZOMBIE_GENERATE_INTERVAL = 10 * 1000
-        const SUN_GENERATE_INTERVAL = 12 * 1000
+        const SUN_GENERATE_INTERVAL = 15 * 1000
         const PLANTS_INTERVAL = 1000
         const ATTACK_INTERVAL = 10
-        const SUN_PLANT_INTERVAL = 5;
+        const SUN_PLANT_INTERVAL = 8;
         const ATTACK_PLANT_INTERVAL = 5;
         const SUN_PLANT_COOLDOWN = 8;
         const ATTACK_PLANT_COOLDOWN = 10;
@@ -234,13 +234,13 @@
                             const id = Date.now()
                             switch(plant.value){
                                 case 1:
-                                    const newSunPlant = new SunPlant(id, 'plant-1', 4, x, y, 8, () => sunPlantCallback(id))
+                                    const newSunPlant = new SunPlant(id, 'plant-1', SUN_PLANT_HEALTH, x, y, SUN_PLANT_INTERVAL, () => sunPlantCallback(id))
                                     map.value[y][x] = newSunPlant;
                                     suns.value -= 50
                                     sunPlantCooldown.value = SUN_PLANT_COOLDOWN
                                     break;
                                 case 2:
-                                    const newAttackPlant = new AttackPlant(id, 'plant-2', 10, x, y, Math.random() > 0.5 ? 3 : 2, () => attackPlantCallback(id, y))
+                                    const newAttackPlant = new AttackPlant(id, 'plant-2', ATTACK_PLANT_HEALTH, x, y, Math.random() > 0.5 ? 3 : 2, () => attackPlantCallback(id, y))
                                     map.value[y][x] = newAttackPlant;
                                     suns.value -= 100
                                     attackPlantCooldown.value = ATTACK_PLANT_COOLDOWN
@@ -249,7 +249,7 @@
                                     map.value[y][x] = 0;
                                     break;
                             }
-                            playSound('plant.ogg')
+                            playSound(randimize(['plant.ogg', 'plant2.ogg']))
                             close()
                         }else{
                             playSound('buzzer.ogg')
@@ -265,7 +265,9 @@
                 function playSound(src, loop){
                     const audio = new Audio(`./sound/${src}`)
                     if(loop) audio.loop = true
-                    audio.play().then(() => delete audio)
+                    audio.play().then(() => {
+                        if(!loop) delete audio
+                    })
                 }
                 
                 function sunItemClick(i) {
@@ -273,10 +275,6 @@
                     addSunScore()
                 }
 
-                function finish(){
-                    // winmusic.ogg
-                }
-                
                 function open(n, sun, isCooldown){
                     if(suns.value<sun || isCooldown){
                         playSound('buzzer.ogg')
@@ -301,22 +299,12 @@
                     position.value = 'off'
                 }
 
-                function atack(){
-                    // kernelpult2.ogg
-                }
-
-                function eat(){
-                    // chomp.ogg
-                }
-
-                function run(){
-                    // / / groan5.ogg
-                }
-
                 function generateZombie(){
                     if(zombieCount.value === 0) playSound('awooga.ogg')
 
                     if(zombieCount.value >= MAX_ZOMBIES) return
+
+                    playSound(randimize(['lowgroan.ogg', 'lowgroan2.ogg', 'groan.ogg', 'groan2.ogg', 'groan3.ogg', 'groan4.ogg']))
 
                     const randomY = Math.floor(Math.random() * 5);
                     const id = Date.now()
@@ -335,7 +323,7 @@
                 function start(){ 
                     isStarted.value = true
 
-                    playSound('plants_vs_zombies_04 - Grasswalk.mp3')
+                    playSound('plants_vs_zombies_04 - Grasswalk.mp3', true)
 
                     interval1 = setInterval(() => {
                         intervalZombies()
@@ -370,8 +358,6 @@
                         items.forEach(item => {
                             if(!item && !item.interval) return
                             
-                            // if(item.name === 'plant-1' || 1 || (item.name === 'plant-2' && zombies.value.find(z => z.y === item.y))) {
-                            // }
                             item.plantInterval()
                         })
                     })
@@ -388,7 +374,7 @@
                             const weaponLeft = weapon.getBoundingClientRect()
 
                             if(weaponLeft.left - zombieLeft.left > 20) {
-                                playSound(['splat.ogg','splat2.ogg','splat3.ogg'][Math.floor(Math.random()*3)])
+                                playSound(randimize(['splat.ogg','splat2.ogg','splat3.ogg']))
                                 const zombieId = zombie.getAttribute('id')
                                 const zombieIndex = zombies.value.findIndex(z => z.id == zombieId)
                                 zombies.value[zombieIndex].health -= 1
@@ -430,6 +416,7 @@
                         
                         if(between < 30) {
                             zombies.value[zombieIndex].eating = true
+                            playSound(randimize(['chomp.ogg', 'chomp2.ogg', 'chompsoft.ogg']))
                             const plantX = plant.getAttribute('data-x')
                             const planty = plant.getAttribute('data-y')
                             
@@ -441,6 +428,7 @@
                                 p.warning = false
                                 zombies.value[zombieIndex].eating = false
                                 map.value[+planty][+plantX] = 0
+                                playSound('gulp.ogg')
                             }
                         } else {
                             zombies.value[zombieIndex].eating = false
@@ -478,6 +466,7 @@
 
                 function attackPlantCallback(id, y) {            
                     if(!zombies.value.some(z => z.y === y)) return
+                    playSound(randimize(['throw.ogg', 'throw2.ogg']))
 
                     const _id = 'weapon' + Date.now()
                     const plant = document.getElementById(id)
@@ -504,6 +493,11 @@
 
                     sunItems.value.push(sun)
                 }
+
+                function randimize(array) {
+                    return array[Math.floor(Math.random()*array.length)]
+                }
+            
 
                 onMounted(() => {
                     window.addEventListener('mousemove', onMouseMove)
@@ -538,12 +532,8 @@
                     add,
                     addSunScore,
                     playSound,
-                    finish,
                     open,
                     close,
-                    atack,
-                    eat,
-                    run,
                     start,
                     sunItemClick,
                     isLastPlant,
@@ -564,4 +554,7 @@
     [+] game over
     [+] coldown
     [+] area suns
+    [-] repeated main song
+    [-] eat sound
+    [-] optimise timings
 -->
